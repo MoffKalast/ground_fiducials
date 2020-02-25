@@ -4,7 +4,7 @@ project(ground_fiducials)
 find_package(catkin REQUIRED)
 
 catkin_package(
-	CATKIN_DEPENDS message_runtime std_msgs sensor_msgs
+	CATKIN_DEPENDS std_msgs geometry_msgs sensor_msgs
 )
 
 install(PROGRAMS
