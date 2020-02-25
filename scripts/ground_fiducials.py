@@ -23,7 +23,7 @@ import math
 
 ROTATION_ANGLE = 30
 
-class Test_Fiducials:
+class GroundFiducials:
     def __init__(self):
         rospy.init_node('test_fiducials', anonymous=False)
         self.state = 'SEARCH'
@@ -32,6 +32,9 @@ class Test_Fiducials:
         self.broadcaster = tf2_ros.TransformBroadcaster()
         self.visited_fiducials = []
         self.closest_fiducial = None
+
+       	self.GO_fids = rospy.get_param("~GO_fiducials", ["fid49","fid51"])
+       	self.STOP_fids = rospy.get_param("~STOP_fiducials", ["fid50"])
 
         self.client = actionlib.SimpleActionClient('move_base',MoveBaseAction)
         self.client.wait_for_server()
@@ -83,12 +86,10 @@ class Test_Fiducials:
                     self.broadcaster.sendTransform(t)
 
                     try:
-            	        tf = self.buffer.lookup_transform("base_link", t.child_frame_id,rospy.Time.now(),rospy.Duration(1.0))
+            	        tf = self.buffer.lookup_transform("base_link", t.child_frame_id,t.header.stamp,rospy.Duration(1.0))
             	        pose_st = PoseStamped()
             	        pose_st.pose.position = tf.transform.translation
-
                         pose_st.pose.orientation = tf.transform.rotation
-                
 
             	        pose_st.header.frame_id = msg.header.frame_id
             	        pose_st.header.stamp = msg.header.stamp
@@ -109,7 +110,6 @@ class Test_Fiducials:
         goal = MoveBaseGoal()
         goal.target_pose = pose_st
         self.client.send_goal(goal)
-
       
         print ("Goal published\n", self.closest_fiducial)
         self.sub_once.unregister()
@@ -157,7 +157,7 @@ class Test_Fiducials:
 
 if __name__ == '__main__':
     try:
-        t = Test_Fiducials()
+        t = GroundFiducials()
         t.test()
 
     except rospy.ROSInterruptException:

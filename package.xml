@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<package>
+  <name>ground_fiducials</name>
+  <version>1.0.0</version>
+  <description>A ground based fiducial waypoint generator.</description>
+
+  <maintainer email="vid.rijavec@gmail.com">Moff Kalast</maintainer>
+  <license>Apache 2.0</license>
+  <author email="vid.rijavec@gmail.co">Moff Kalast</author>
+  <buildtool_depend>catkin</buildtool_depend>
+  <run_depend>std_msgs</run_depend>
+  <run_depend>geometry_msgs</run_depend>
+
+</package>

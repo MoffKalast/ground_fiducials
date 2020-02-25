@@ -1,0 +1,45 @@
+<launch>
+
+	<!-- Use higher resolution camera so fiducials are easier to see on the floor         -->
+    <!-- To experiment with floor fiducials use the 410x308 raspicam and 0.14mm fiducials -->
+    <!-- Original follow used camerav2_410x308_30fps  try camerav2_1640x1232_10fps        -->
+    <include file="$(find raspicam_node)/launch/camerav2_1280x960.launch" />
+    <include file="$(find magni_description)/launch/description.launch" />
+
+    <!-- We want aruco detect to give us the 6DOF pose, 
+    not just the pixel coordinates of the vertices -->
+    <arg name="do_pose_estimation" default="true"/>
+
+    <!-- Run aruco_detect with special parameters to optimize for speed -->
+    <node pkg="aruco_detect" name="aruco_detect"
+        type="aruco_detect" output="screen" respawn="false">
+        <param name="image_transport" value="compressed"/>
+        <param name="publish_images" value="true" />
+        <param name="fiducial_len" value="$(arg fiducial_len)"/>
+        <param name="do_pose_estimation" value="$(arg do_pose_estimation)"/>
+        <param name="adaptiveThreshWinSizeStep" value="4" />
+        <param name="adaptiveThreshWinSizeMin" value="10" />
+        <param name="adaptiveThreshWinSizeMax" value="100" />
+        <param name="doCornerRefinement" value="False" />
+        <param name="do_tracking" value="false" />
+        <param name="num_threads" value="3" />
+        <remap from="/camera/compressed" 
+            to="/raspicam_node/image/compressed"/>
+        <remap from="/camera_info" to="/raspicam_node/camera_info"/>
+    </node>
+
+    <!-- Run move_basic to drive the robot -->
+	<node name="move_basic" pkg="move_basic" type="move_basic" output="screen" />	
+
+
+	<arg name="GO_fiducials" default="[fid49, fid51]"/>
+    <arg name="STOP_fiducials" default="[fid50]"/>
+
+    <!-- Run ground_fiducials to generate move_base goals -->
+    <node name="ground_fiducials" pkg="ground_fiducials" type="ground_fiducials.py" output="screen">
+        <param name="GO_fiducials" value="$(arg GO_fiducials)"/>
+        <param name="STOP_fiducials" value="$(arg STOP_fiducials)"/>
+        <param name="target_search" value="$(arg target_search)"/>
+    </node>
+
+</launch>
