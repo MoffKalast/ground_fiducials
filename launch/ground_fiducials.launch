@@ -1,8 +1,8 @@
 <launch>
 
-    <arg name="fiducial_len" default="14.0"/>
-    <arg name="GO_fiducials" default="[fid49, fid51]"/>
-    <arg name="STOP_fiducials" default="[fid50]"/>
+    <arg name="fiducial_len" default="0.14"/>
+    <arg name="GO_fiducials" default="[51, 49]"/>
+    <arg name="STOP_fiducials" default="[50]"/>
 
     <!-- We want aruco detect to give us the 6DOF pose, 
     not just the pixel coordinates of the vertices -->
@@ -11,8 +11,8 @@
 	<!-- Use higher resolution camera so fiducials are easier to see on the floor         -->
     <!-- To experiment with floor fiducials use the 410x308 raspicam and 0.14mm fiducials -->
     <!-- Original follow used camerav2_410x308_30fps  try camerav2_1640x1232_10fps        -->
-    <include file="$(find raspicam_node)/launch/camerav2_1280x960.launch" />
     <include file="$(find magni_description)/launch/description.launch" />
+    <include file="$(find raspicam_node)/launch/camerav2_1280x960.launch" />
 
     <!-- Run aruco_detect with special parameters to optimize for speed -->
     <node pkg="aruco_detect" name="aruco_detect"
@@ -26,13 +26,30 @@
         <param name="adaptiveThreshWinSizeMax" value="100" />
         <param name="doCornerRefinement" value="False" />
         <param name="do_tracking" value="false" />
-        <param name="num_threads" value="3" />
+        <param name="num_threads" value="4" />
         <remap from="/camera/compressed" to="/raspicam_node/image/compressed"/>
         <remap from="/camera_info" to="/raspicam_node/camera_info"/>
     </node>
 
     <!-- Run move_basic to drive the robot -->
-	<node name="move_basic" pkg="move_basic" type="move_basic" output="screen" />	
+	<node name="move_basic" pkg="move_basic" type="move_basic" output="screen">
+        <!-- Footprint for obstacle detection -->
+        <param name="robot_width" value="0.20"/>
+        <param name="robot_front_length" value="0.1"/>
+        <param name="robot_back_length" value="0.32"/>
+        <param name="max_linear_velocity" value="1.2"/>
+
+
+        <!-- lateral control -->
+        <param name="min_side_dist" value="0.3"/>
+        <param name="max_side_dist" value="2"/>
+        <param name="max_follow_dist_without_wall" value="1"/>
+        <param name="max_angular_deviation" value="0.01"/>
+
+        <param name="lateral_kp" value="5.0"/>
+        <param name="lateral_ki" value="0.0"/>
+        <param name="lateral_kd" value="60.0"/>
+    </node>	
 
     <!-- Run ground_fiducials to generate move_base goals -->
     <node name="ground_fiducials" pkg="ground_fiducials" type="ground_fiducials.py" output="screen">
