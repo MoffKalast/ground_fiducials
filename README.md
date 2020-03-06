@@ -20,8 +20,8 @@ On the workstation:
     
 ### Paramaters
 
-* `GO_fiducials`: The array of fiducials we are following, in order of priority. Default `[fid49, fid51]`.
-* `STOP_fiducials`: The array of fiducials at which we stop and require interaction to proceed. Default `[fid50]`.
+* `GO_fiducials`: The array of fiducials we are following, in order of priority. Default `[49, 51]`.
+* `STOP_fiducials`: The array of fiducials at which we stop and require interaction to proceed. Default `[50]`.
 
 Requires:
 
