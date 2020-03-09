@@ -49,6 +49,8 @@ class GroundFiducials:
 
 		self.closest_fiducial = None;
 
+		self.positionlist = []
+
 		self.fid_subscriber = rospy.Subscriber("/fiducial_transforms", FiducialTransformArray, self.fiducial_callback)
 
 		
@@ -97,6 +99,7 @@ class GroundFiducials:
 
 		return do_transform_vector3(v, t)
 
+
 	def fiducial_callback(self,msg):
 
 		if msg.transforms:
@@ -110,8 +113,6 @@ class GroundFiducials:
 			if fiducials:
 
 					self.closest_fiducial = fiducials[0]
-
-					print(self.closest_fiducial)
 
 					t = TransformStamped()
 					t.child_frame_id = "fid%d"% self.closest_fiducial.fiducial_id
@@ -127,34 +128,32 @@ class GroundFiducials:
 
 					try:
 						tf = self.buffer.lookup_transform("base_link", t.child_frame_id, t.header.stamp, rospy.Duration(1.0))
-
-						self.process_goal(tf, msg.header.stamp);
+						self.process_goal(tf, msg.header.stamp, self.fids[self.closest_fiducial.fiducial_id]);
 					except:
-						traceback.print_exc()
-						print ("Could not get transform for %s" % self.closest_fiducial.fiducial_id)
+						print("Couldn't find transform.")
 			
-	def process_goal(self, tf, stamp):
+	def process_goal(self, tf, stamp, action):
 		# Generate the allignment pose
 
 		startPose = PoseStamped()
 		startPose.header.frame_id = "base_link"
 		startPose.header.stamp = stamp
-
+		
 		startPose.pose.position = tf.transform.translation
 		startPose.pose.position.z = 0
-
+		
 		rotat = tf.transform.rotation
 		quat_rotat = (rotat.x, rotat.y, rotat.z, rotat.w)
 		(roll, pitch, yaw) = euler_from_quaternion(quat_rotat)
-
+		
 		final_rotat = quaternion_from_euler(0, 0, yaw + math.radians(90))
 		startPose.pose.orientation.x = final_rotat[0]
 		startPose.pose.orientation.y = final_rotat[1]
 		startPose.pose.orientation.z = final_rotat[2]
 		startPose.pose.orientation.w = final_rotat[3]
-
+		
 		# Generate target pose to launch towards
-
+		
 		targetPose = PoseStamped()
 		targetPose.header.frame_id = "base_link"
 		targetPose.header.stamp = stamp
@@ -166,10 +165,10 @@ class GroundFiducials:
 
 		print("---- GOAL SENT. ----")
 
-		result = self.send_goal(startPose, targetPose)
+		result = self.send_goal(startPose, targetPose, action)
 
 
-	def send_goal(self, startPose, targetPose):
+	def send_goal(self, startPose, targetPose, action):
 
 		self.fid_subscriber.unregister()
 
@@ -184,14 +183,21 @@ class GroundFiducials:
 		if success and self.client.get_state() == GoalStatus.SUCCEEDED:
 			print("Goal reached")
 
-			self.fid_subscriber = rospy.Subscriber("/fiducial_transforms", FiducialTransformArray, self.fiducial_callback)
-			self.closest_fiducial = None
+			if action == "GO":
 
-			goal = MoveBaseGoal()
-			goal.target_pose = targetPose
-			self.client.send_goal(goal)
+				self.fid_subscriber = rospy.Subscriber("/fiducial_transforms", FiducialTransformArray, self.fiducial_callback)
+				self.closest_fiducial = None
 
-			print("Target goal published!")
+				goal = MoveBaseGoal()
+				goal.target_pose = targetPose
+				self.client.send_goal(goal)
+
+				print("Target goal published!")
+
+			else:
+
+				print("Stopping on STOP.")
+
 			
 		else:
 			self.client.cancel_goal()
