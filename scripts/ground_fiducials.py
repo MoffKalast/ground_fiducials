@@ -53,6 +53,8 @@ class GroundFiducials:
 
 		self.fid_subscriber = rospy.Subscriber("/fiducial_transforms", FiducialTransformArray, self.fiducial_callback)
 
+		#self.velocity_publisher = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
+
 		
 	# def rotate(self):
 
@@ -127,7 +129,7 @@ class GroundFiducials:
 					print("---- Transform sent. ----")
 
 					try:
-						tf = self.buffer.lookup_transform("base_link", t.child_frame_id, t.header.stamp, rospy.Duration(1.0))
+						tf = self.buffer.lookup_transform("odom", t.child_frame_id, t.header.stamp, rospy.Duration(1.0))
 						self.process_goal(tf, msg.header.stamp, self.fids[self.closest_fiducial.fiducial_id]);
 					except:
 						print("Couldn't find transform.")
@@ -136,7 +138,7 @@ class GroundFiducials:
 		# Generate the allignment pose
 
 		startPose = PoseStamped()
-		startPose.header.frame_id = "base_link"
+		startPose.header.frame_id = "odom"
 		startPose.header.stamp = stamp
 		
 		startPose.pose.position = tf.transform.translation
@@ -161,7 +163,7 @@ class GroundFiducials:
 		targetPose.pose.orientation.y = 0
 		targetPose.pose.orientation.z = 0
 		targetPose.pose.orientation.w = 1
-		targetPose.pose.position.x = 5.0
+		targetPose.pose.position.x = 6.0
 
 		print("---- GOAL SENT. ----")
 
@@ -185,33 +187,28 @@ class GroundFiducials:
 
 			if action == "GO":
 
-				self.fid_subscriber = rospy.Subscriber("/fiducial_transforms", FiducialTransformArray, self.fiducial_callback)
-				self.closest_fiducial = None
+				print("Action: GO")
 
-				goal = MoveBaseGoal()
-				goal.target_pose = targetPose
-				self.client.send_goal(goal)
-
+				self.sendTargetGoal(targetPose)
 				print("Target goal published!")
 
-			else:
+			elif action == "STOP":
+				print("Action: STOP")
 
-				print("Stopping on STOP.")
-
-			
+				input("Press any key to continue")
+				self.sendTargetGoal(targetPose)
 		else:
 			self.client.cancel_goal()
 		
 		return self.client.get_result()
 
+	def sendTargetGoal(self, targetPose):
+		self.fid_subscriber = rospy.Subscriber("/fiducial_transforms", FiducialTransformArray, self.fiducial_callback)
+		self.closest_fiducial = None
 
-	def wait(self, toggle):
-		if toggle:
-			self.waiting = True
-			self.fid_subscriber.unregister()
-
-		else:
-			self.waiting = False
+		goal = MoveBaseGoal()
+		goal.target_pose = targetPose
+		self.client.send_goal(goal)
 
 
 if __name__ == '__main__':
@@ -220,10 +217,6 @@ if __name__ == '__main__':
 		sleep_time = 1.0/UPDATE_RATE
 		while not rospy.is_shutdown():
 			rospy.sleep(sleep_time)
-			if t.waiting:
-				get = input("Press any key to continue")
-				if get:
-					t.waiting = False
 
 	except rospy.ROSInterruptException:
 		print("Script interrupted", file=sys.stderr)
