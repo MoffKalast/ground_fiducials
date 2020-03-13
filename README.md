@@ -14,6 +14,10 @@ On the robot:
 
     roslaunch ground_fiducials ground_fiducials.launch
 
+or
+
+    roslaunch ground_fiducials smooth_fiducials.launch
+
 On the workstation:
 
     roslaunch magni_viz view_nav.launch

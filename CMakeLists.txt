@@ -9,6 +9,7 @@ catkin_package(
 
 install(PROGRAMS
 	scripts/ground_fiducials.py
+	scripts/smooth_fiducials.py
 	DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 

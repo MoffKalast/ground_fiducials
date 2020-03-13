@@ -19,6 +19,7 @@ from tf2_geometry_msgs import do_transform_vector3
 from tf.transformations import quaternion_from_euler, euler_from_quaternion
 
 UPDATE_RATE = 30
+LAUNCH_DISTANCE = 2.0
 
 def arrayify(string):
 	string = string.replace(' ', '').replace('[','').replace(']','')
@@ -47,7 +48,8 @@ class GroundFiducials:
 		self.client = actionlib.SimpleActionClient('move_base',MoveBaseAction)
 		self.client.wait_for_server()
 
-		self.closest_fiducial = None;
+		self.fid_transform = None
+		self.fid_action = None
 
 		self.positionlist = []
 
@@ -114,102 +116,98 @@ class GroundFiducials:
 
 			if fiducials:
 
-					self.closest_fiducial = fiducials[0]
+					self.fid_subscriber.unregister()
 
 					t = TransformStamped()
-					t.child_frame_id = "fid%d"% self.closest_fiducial.fiducial_id
+					t.child_frame_id = "fid%d"% fiducials[0].fiducial_id
 					t.header.frame_id = "raspicam"
 					t.header.stamp = msg.header.stamp
 			
-					t.transform.translation = self.closest_fiducial.transform.translation
-					t.transform.rotation = self.closest_fiducial.transform.rotation
+					t.transform.translation = fiducials[0].transform.translation
+					t.transform.rotation = fiducials[0].transform.rotation
 
 					self.broadcaster.sendTransform(t)
 
 					print("---- Transform sent. ----")
 
 					try:
-						tf = self.buffer.lookup_transform("odom", t.child_frame_id, t.header.stamp, rospy.Duration(1.0))
-						self.process_goal(tf, msg.header.stamp, self.fids[self.closest_fiducial.fiducial_id]);
+						transform = self.buffer.lookup_transform("odom", t.child_frame_id, t.header.stamp, rospy.Duration(1.0))
+						if math.fabs(self.get_marker_error(transform)) < 10:
+							self.fid_transform = transform
+							self.fid_action = self.fids[fiducials[0].fiducial_id]
+							self.new_fid_goal()
+						else:
+							self.fid_subscriber = rospy.Subscriber("/fiducial_transforms", FiducialTransformArray, self.fiducial_callback)
+						print("------------- MARKER ERROR: "+str(self.get_marker_error(transform))+" ------------")
 					except:
 						print("Couldn't find transform.")
+						self.fid_subscriber = rospy.Subscriber("/fiducial_transforms", FiducialTransformArray, self.fiducial_callback)
 			
-	def process_goal(self, tf, stamp, action):
-		# Generate the allignment pose
+	def get_marker_error(self, trans):
+		r = trans.transform.rotation
+		quat_rotat = (r.x, r.y, r.z, r.w)
+		(roll, pitch, yaw) = euler_from_quaternion(quat_rotat)
+		return math.degrees(roll) + math.degrees(pitch)
+
+	def get_yaw(self, trans):
+		r = trans.transform.rotation
+		quat_rotat = (r.x, r.y, r.z, r.w)
+		(roll, pitch, yaw) = euler_from_quaternion(quat_rotat)
+		return yaw + math.radians(90)
+
+	def reproject_transform(self, distance):
+		x = self.fid_transform.transform.translation.x
+		y = self.fid_transform.transform.translation.y
+		yaw = self.get_yaw(self.fid_transform)
+
+		x += distance * math.cos(yaw)
+		y += distance * math.sin(yaw)
+
+		self.fid_transform.transform.translation.x = x
+		self.fid_transform.transform.translation.y = y
+
+	def process_goal(self, trans, stamp):
 
 		startPose = PoseStamped()
 		startPose.header.frame_id = "odom"
 		startPose.header.stamp = stamp
 		
-		startPose.pose.position = tf.transform.translation
+		startPose.pose.position = trans.transform.translation
 		startPose.pose.position.z = 0
 		
-		rotat = tf.transform.rotation
-		quat_rotat = (rotat.x, rotat.y, rotat.z, rotat.w)
-		(roll, pitch, yaw) = euler_from_quaternion(quat_rotat)
-		
-		final_rotat = quaternion_from_euler(0, 0, yaw + math.radians(90))
+		final_rotat = quaternion_from_euler(0, 0, self.get_yaw(trans))
 		startPose.pose.orientation.x = final_rotat[0]
 		startPose.pose.orientation.y = final_rotat[1]
 		startPose.pose.orientation.z = final_rotat[2]
 		startPose.pose.orientation.w = final_rotat[3]
-		
-		# Generate target pose to launch towards
-		
-		targetPose = PoseStamped()
-		targetPose.header.frame_id = "base_link"
-		targetPose.header.stamp = stamp
-		targetPose.pose.orientation.x = 0
-		targetPose.pose.orientation.y = 0
-		targetPose.pose.orientation.z = 0
-		targetPose.pose.orientation.w = 1
-		targetPose.pose.position.x = 7.0
-
-		print("---- GOAL SENT. ----")
-
-		result = self.send_goal(startPose, targetPose, action)
-
-
-	def send_goal(self, startPose, targetPose, action):
-
-		self.fid_subscriber.unregister()
 
 		goal = MoveBaseGoal()
 		goal.target_pose = startPose
 		self.client.send_goal(goal)
 
-		print("Start goal published\n", self.closest_fiducial.fiducial_id)
 
-		success = self.client.wait_for_result()
+	def new_fid_goal(self):
+		if self.fid_action == "GO":
+			self.reproject_transform(0.25)
 
-		if success and self.client.get_state() == GoalStatus.SUCCEEDED:
-			print("Goal reached")
+		self.process_goal(self.fid_transform, rospy.Time.now())
 
-			if action == "GO":
-
-				print("Action: GO")
-
-				self.sendTargetGoal(targetPose)
-				print("Target goal published!")
-
-			elif action == "STOP":
-				print("Action: STOP")
-
-				input("Press any key to continue")
-				self.sendTargetGoal(targetPose)
-		else:
-			self.client.cancel_goal()
-		
-		return self.client.get_result()
-
-	def sendTargetGoal(self, targetPose):
+	def new_goal(self):
 		self.fid_subscriber = rospy.Subscriber("/fiducial_transforms", FiducialTransformArray, self.fiducial_callback)
-		self.closest_fiducial = None
 
-		goal = MoveBaseGoal()
-		goal.target_pose = targetPose
-		self.client.send_goal(goal)
+		self.reproject_transform(LAUNCH_DISTANCE)
+		self.process_goal(self.fid_transform, rospy.Time.now())
+		print("Next goal published")
 
+	def distance_to_base(self):
+		try:
+			pose = self.buffer.lookup_transform("odom", "base_link", rospy.Time.now(), rospy.Duration(0.5))
+			dist = (self.fid_transform.transform.translation.x - pose.transform.translation.x) ** 2 
+			dist += (self.fid_transform.transform.translation.y - pose.transform.translation.y) ** 2 
+			dist = math.sqrt(dist)
+			return dist
+		except:
+			return -1
 
 if __name__ == '__main__':
 	try:
@@ -217,6 +215,13 @@ if __name__ == '__main__':
 		sleep_time = 1.0/UPDATE_RATE
 		while not rospy.is_shutdown():
 			rospy.sleep(sleep_time)
+
+			if t.fid_transform != None and t.fid_action == "GO":
+				dist = t.distance_to_base()
+				print("DIST:"+str(dist))
+				if dist > 0 and dist < 0.65:
+					t.new_goal()
+
 
 	except rospy.ROSInterruptException:
 		print("Script interrupted", file=sys.stderr)

@@ -45,8 +45,6 @@
 
         <param name="verbose_info" value="False"/>
         <param name="smooth_follow" value="True"/>
-        <param name="smooth_breaking_min" value="0"/>
-        <param name="smooth_breaking_max" value="0.0075"/>
         
         <!-- lateral control -->
         <param name="max_angular_deviation" value="0.1"/>
@@ -66,7 +64,7 @@
     </node>	
 
     <!-- Run ground_fiducials to generate move_base goals -->
-    <node name="ground_fiducials" pkg="ground_fiducials" type="ground_fiducials.py" output="screen">
+    <node name="smooth_fiducials" pkg="ground_fiducials" type="smooth_fiducials.py" output="screen">
         <param name="GO_fiducials" value="$(arg GO_fiducials)"/>
         <param name="STOP_fiducials" value="$(arg STOP_fiducials)"/>
     </node>
